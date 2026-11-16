@@ -14,13 +14,15 @@ Turn it on, browse, and it collects every image you see. Click **Download ZIP** 
 - Browse normally. Scroll down pages so lazy-loaded images load; they get picked up too. It works across all tabs.
 - Click **Download ZIP**. A tab opens, fetches each image, and saves `images_<date>_<time>.zip` to your Downloads.
 - **Clear** empties the list to start a new batch. Turning it **OFF** stops collecting but keeps the list.
+- **Only from this website**: open the site you want, then tick this box in the popup. It only collects from that site (and its subdomains) and ignores your other tabs. Untick it to collect from everywhere again.
 - Optional: tick "Skip tiny images" to drop icons and 1x1 tracking pixels.
 
 ## What it catches
-`<img>` tags (including `srcset` and lazy `data-src`), `<picture>` sources, CSS background images, video posters, SVG images, embedded `data:` images, and any image the browser downloads while it's on. The same image URL is only saved once.
+`<img>` tags (including `srcset` and lazy `data-src`), `<picture>` sources, CSS background images, video posters, SVG images, embedded `data:` images, `blob:` images that a page builds itself (for example book-reader pages like HathiTrust: they're saved the moment they appear, before the page throws them away), and any image the browser downloads while it's on. The same image URL is only saved once.
 
 ## Inside the ZIP
 - `1.jpg`, `2.png`, ... in the order they were seen. The extension is detected from the actual file.
+- Images that have an `aria-labelledby` label are named after it instead, e.g. `<img aria-labelledby="caption492" ...>` becomes `caption492.jpg`.
 - `_sources.txt` lists which original URL and page each number came from.
 - `_failed.txt` (only if needed) lists images that couldn't be downloaded, e.g. expired links.
 

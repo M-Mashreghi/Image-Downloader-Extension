@@ -12,6 +12,53 @@
   let reported = new Set();
   let flushTimer = null;
   let scanTimer = null;
+  const names = new Map();      // url -> file name (from aria-labelledby)
+  const blobDone = new Set();   // blob: URLs already captured
+
+  // File name for an image, e.g. aria-labelledby="caption492" -> "caption492".
+  function nameFor(el) {
+    const v = (el.getAttribute("aria-labelledby") || "").trim().split(/\s+/)[0];
+    return v ? v.replace(/[^\w.-]+/g, "_").slice(0, 100) : "";
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // Fallback when the blob: URL was already revoked: copy the shown image.
+  function canvasBlob(img) {
+    return new Promise((resolve) => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        if (!c.width || !c.height) return resolve(null);
+        c.getContext("2d").drawImage(img, 0, 0);
+        c.toBlob((b) => resolve(b), "image/png");
+      } catch { resolve(null); }
+    });
+  }
+
+  // blob: images only exist inside this page, so grab their bytes right away.
+  function captureBlob(img) {
+    const u = img.currentSrc || img.src;
+    if (!enabled || !u || !u.startsWith("blob:") || blobDone.has(u)) return;
+    blobDone.add(u);
+    const go = async () => {
+      let blob = null;
+      try { const r = await fetch(u); if (r.ok) blob = await r.blob(); } catch {}
+      if (!blob || !blob.size || !blob.type.startsWith("image/")) blob = (await canvasBlob(img)) || blob;
+      if (!blob || !blob.size) { blobDone.delete(u); return; }
+      const dataUrl = await blobToDataUrl(blob);
+      chrome.runtime.sendMessage({ type: "foundBlob", dataUrl, name: nameFor(img), page: location.href }).catch(() => {});
+    };
+    if (img.complete && img.naturalWidth) go();
+    else img.addEventListener("load", go, { once: true });
+  }
 
   const LAZY_ATTRS = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-url",
     "data-hi-res-src", "data-full", "data-large", "data-zoom-image", "data-srcset", "data-lazy-srcset"];
@@ -23,10 +70,11 @@
     try { return new URL(u, document.baseURI).href; } catch { return null; }
   }
 
-  function add(u) {
+  function add(u, name) {
     const a = abs(u);
     if (!a || reported.has(a)) return;
     if (!/^(https?:|data:image\/)/i.test(a)) return;
+    if (name) names.set(a, name);
     pending.add(a);
     if (!flushTimer) flushTimer = setTimeout(flush, 250);
   }
@@ -34,9 +82,9 @@
   function flush() {
     flushTimer = null;
     if (!pending.size || !enabled) { pending.clear(); return; }
-    const urls = [...pending];
+    const urls = [...pending].map((u) => (names.has(u) ? { url: u, name: names.get(u) } : u));
     pending.clear();
-    urls.forEach((u) => reported.add(u));
+    urls.forEach((u) => reported.add(u.url || u));
     chrome.runtime.sendMessage({ type: "found", urls, page: location.href }).catch(() => {});
   }
 
@@ -57,7 +105,9 @@
     if (!(el instanceof Element)) return;
     const tag = el.tagName;
     if (tag === "IMG") {
-      add(el.currentSrc || el.src);
+      const src = el.currentSrc || el.src;
+      if (src && src.startsWith("blob:")) captureBlob(el);
+      else add(src, nameFor(el));
       addSrcset(el.getAttribute("srcset"));
     } else if (tag === "SOURCE" && el.parentElement && el.parentElement.tagName === "PICTURE") {
       addSrcset(el.getAttribute("srcset"));
@@ -152,7 +202,7 @@
 
   function setEnabled(on) {
     enabled = !!on;
-    if (enabled) { reported.clear(); start(); } else stop();
+    if (enabled) { reported.clear(); blobDone.clear(); start(); } else stop();
   }
 
   chrome.runtime.onMessage.addListener((msg) => {

@@ -1,4 +1,10 @@
 const $ = (id) => document.getElementById(id);
+let currentHost = "";
+
+async function activeHost() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  try { const u = new URL(tab.url); return /^https?:$/.test(u.protocol) ? u.hostname : ""; } catch { return ""; }
+}
 
 function render(state) {
   $("enabled").checked = state.enabled;
@@ -6,6 +12,8 @@ function render(state) {
   $("count").textContent = state.count;
   $("download").disabled = state.count === 0;
   $("clear").disabled = state.count === 0;
+  $("siteOnly").checked = !!state.siteOnly;
+  $("siteName").textContent = state.siteOnly || (currentHost ? currentHost : "");
   $("hint").textContent = state.enabled
     ? "Collecting… scroll around and open pages to grab more."
     : "Turn it on, then browse. Every image you see is added.";
@@ -17,6 +25,11 @@ async function refresh() {
 
 $("enabled").addEventListener("change", async (e) => {
   render(await chrome.runtime.sendMessage({ type: "setEnabled", enabled: e.target.checked }));
+});
+
+$("siteOnly").addEventListener("change", async (e) => {
+  if (e.target.checked && !currentHost) { e.target.checked = false; $("hint").textContent = "Open a website tab first, then tick this."; return; }
+  render(await chrome.runtime.sendMessage({ type: "setSiteOnly", site: e.target.checked ? currentHost : "" }));
 });
 
 $("clear").addEventListener("click", async () => {
@@ -33,4 +46,4 @@ chrome.storage.local.get({ skipSmall: false }).then((s) => { $("skipSmall").chec
 $("skipSmall").addEventListener("change", (e) => chrome.storage.local.set({ skipSmall: e.target.checked }));
 
 chrome.storage.onChanged.addListener(refresh);
-refresh();
+activeHost().then((h) => { currentHost = h; refresh(); });

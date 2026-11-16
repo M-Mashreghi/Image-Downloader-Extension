@@ -50,6 +50,14 @@ async function tooSmall(blob, ext) {
 }
 
 async function fetchImage(item) {
+  if (item.stored) {
+    const rec = await DB.get(item.stored);
+    if (!rec) throw new Error("saved copy missing");
+    const bytes = new Uint8Array(rec.data);
+    const ext = sniff(bytes) || TYPE_EXT[rec.type] || "png";
+    if (SKIP_SMALL && await tooSmall(new Blob([bytes]), ext)) return { skipped: true };
+    return { bytes, ext };
+  }
   const res = await fetch(item.url, { credentials: "include", cache: "force-cache", referrer: item.page || "about:client" })
     .catch(() => fetch(item.url, { cache: "force-cache" }));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -96,14 +104,20 @@ async function run() {
   $("status").textContent = "Creating ZIP…";
   const zip = new ZipWriter();
   const index = [];
-  let n = 0;
+  const used = new Set();
+  let n = 0, num = 0;
   for (let i = 0; i < total; i++) {
     const r = results[i];
     if (!r) continue;
     n++;
-    const name = `${n}.${r.ext}`;
+    // Named images (aria-labelledby, e.g. caption492.jpg) keep their name; others get 1, 2, 3...
+    let base = images[i].name;
+    if (!base) { do { base = String(++num); } while (used.has(`${base}.${r.ext}`)); }
+    let name = `${base}.${r.ext}`;
+    for (let k = 2; used.has(name); k++) name = `${base}_${k}.${r.ext}`;
+    used.add(name);
     zip.add(name, r.bytes);
-    index.push(`${name}\t${images[i].url.startsWith("data:") ? "(embedded data image)" : images[i].url}\t${images[i].page}`);
+    index.push(`${name}\t${images[i].stored ? "(image made inside the page, blob:)" : images[i].url.startsWith("data:") ? "(embedded data image)" : images[i].url}\t${images[i].page}`);
   }
   if (!n) {
     $("status").textContent = "None of the images could be downloaded.";
