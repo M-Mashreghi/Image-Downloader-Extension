@@ -117,7 +117,7 @@ async function run() {
     for (let k = 2; used.has(name); k++) name = `${base}_${k}.${r.ext}`;
     used.add(name);
     zip.add(name, r.bytes);
-    index.push(`${name}\t${images[i].stored ? "(image made inside the page, blob:)" : images[i].url.startsWith("data:") ? "(embedded data image)" : images[i].url}\t${images[i].page}`);
+    index.push(`${name}\t${images[i].stored ? (images[i].source || "(image made inside the page, blob:)") : images[i].url.startsWith("data:") ? "(embedded data image)" : images[i].url}\t${images[i].page}`);
   }
   if (!n) {
     $("status").textContent = "None of the images could be downloaded.";

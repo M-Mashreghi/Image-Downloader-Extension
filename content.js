@@ -43,21 +43,59 @@
     });
   }
 
-  // blob: images only exist inside this page, so grab their bytes right away.
+  // Ask the page-side hook (page-hook.js) for the bytes behind a blob: URL.
+  const waiting = new Map();
+  let reqId = 0;
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.__imageCollector !== "blob") return;
+    const cb = waiting.get(d.id);
+    if (cb) { waiting.delete(d.id); cb(d); }
+  });
+  function askPage(url) {
+    return new Promise((resolve) => {
+      const id = ++reqId;
+      const t = setTimeout(() => { waiting.delete(id); resolve(null); }, 3000);
+      waiting.set(id, (d) => { clearTimeout(t); resolve(d.ok ? d : null); });
+      window.postMessage({ __imageCollector: "get", id, url }, "*");
+    });
+  }
+
+  // Save the image behind a blob: URL (the page's own copy), named after its label.
+  async function captureUrl(u, name, img) {
+    if (!enabled || !u || blobDone.has(u)) return;
+    blobDone.add(u);
+    let blob = null, source = "";
+    const fromPage = await askPage(u);                        // 1) the original file, kept by page-hook.js
+    if (fromPage) { blob = new Blob([fromPage.buf], { type: fromPage.type }); source = fromPage.src || ""; }
+    if (!blob || !blob.size) {                                 // 2) read the blob: URL directly
+      try { const r = await fetch(u); if (r.ok) blob = await r.blob(); } catch {}
+    }
+    if ((!blob || !blob.size) && img) blob = await canvasBlob(img);   // 3) copy the picture on screen
+    if (!blob || !blob.size) { blobDone.delete(u); return; }
+    const dataUrl = await blobToDataUrl(blob);
+    chrome.runtime.sendMessage({ type: "foundBlob", dataUrl, name, source, page: location.href }).catch(() => {});
+  }
+
+  // The page hook reports blob: images the instant they are put on screen.
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.__imageCollector !== "shown") return;
+    const label = String(d.label || "").trim().split(/\s+/)[0];
+    captureUrl(d.url, label ? label.replace(/[^\w.-]+/g, "_").slice(0, 100) : "", null);
+  });
+
+  // blob: images found while scanning the page.
   function captureBlob(img) {
     const u = img.currentSrc || img.src;
     if (!enabled || !u || !u.startsWith("blob:") || blobDone.has(u)) return;
-    blobDone.add(u);
-    const go = async () => {
-      let blob = null;
-      try { const r = await fetch(u); if (r.ok) blob = await r.blob(); } catch {}
-      if (!blob || !blob.size || !blob.type.startsWith("image/")) blob = (await canvasBlob(img)) || blob;
-      if (!blob || !blob.size) { blobDone.delete(u); return; }
-      const dataUrl = await blobToDataUrl(blob);
-      chrome.runtime.sendMessage({ type: "foundBlob", dataUrl, name: nameFor(img), page: location.href }).catch(() => {});
-    };
-    if (img.complete && img.naturalWidth) go();
-    else img.addEventListener("load", go, { once: true });
+    const name = nameFor(img);
+    if (img.complete && img.naturalWidth) captureUrl(u, name, img);
+    else {
+      const go = () => captureUrl(u, name, img);
+      img.addEventListener("load", go, { once: true });
+      img.addEventListener("error", go, { once: true });
+    }
   }
 
   const LAZY_ATTRS = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-url",
@@ -107,7 +145,7 @@
     if (tag === "IMG") {
       const src = el.currentSrc || el.src;
       if (src && src.startsWith("blob:")) captureBlob(el);
-      else add(src, nameFor(el));
+      else add(src, src && src.startsWith("data:") ? "" : nameFor(el));
       addSrcset(el.getAttribute("srcset"));
     } else if (tag === "SOURCE" && el.parentElement && el.parentElement.tagName === "PICTURE") {
       addSrcset(el.getAttribute("srcset"));

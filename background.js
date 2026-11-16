@@ -88,7 +88,7 @@ async function addBlob(msg, page) {
   if (seen.has(key)) return 0;
   seen.add(key);
   await DB.put(hash, { type: res.headers.get("content-type") || "", data: buf });
-  images.push({ url: key, page: page || "", name: msg.name || "", stored: hash });
+  images.push({ url: key, page: page || "", name: msg.name || "", stored: hash, source: msg.source || "" });
   scheduleSave();
   updateBadge();
   return 1;

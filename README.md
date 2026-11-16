@@ -12,6 +12,7 @@ Turn it on, browse, and it collects every image you see. Click **Download ZIP** 
 ## Use
 - Click the icon and flip the switch to **ON** (the icon turns blue). The badge shows how many images are collected.
 - Browse normally. Scroll down pages so lazy-loaded images load; they get picked up too. It works across all tabs.
+- On book readers like HathiTrust, **reload the page after installing or updating** the extension, then turn it on and scroll through the pages you want. Each page is saved as it appears.
 - Click **Download ZIP**. A tab opens, fetches each image, and saves `images_<date>_<time>.zip` to your Downloads.
 - **Clear** empties the list to start a new batch. Turning it **OFF** stops collecting but keeps the list.
 - **Only from this website**: open the site you want, then tick this box in the popup. It only collects from that site (and its subdomains) and ignores your other tabs. Untick it to collect from everywhere again.
