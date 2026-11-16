@@ -1,0 +1,22 @@
+:root { --blue: #2563eb; --text: #111827; --muted: #6b7280; --bg: #ffffff; --line: #e5e7eb; }
+@media (prefers-color-scheme: dark) {
+  :root { --text: #f3f4f6; --muted: #9ca3af; --bg: #1f2937; --line: #374151; }
+}
+* { box-sizing: border-box; }
+body { width: 270px; margin: 0; padding: 14px; font: 13px/1.4 system-ui, sans-serif; color: var(--text); background: var(--bg); }
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+h1 { font-size: 15px; margin: 0; }
+.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.toggle input { display: none; }
+.slider { width: 42px; height: 24px; background: #9ca3af; border-radius: 12px; position: relative; transition: .2s; }
+.slider::after { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+.toggle input:checked + .slider { background: var(--blue); }
+.toggle input:checked + .slider::after { left: 21px; }
+.count { margin: 14px 0 2px; font-size: 13px; }
+.count span { font-size: 26px; font-weight: 700; margin-right: 4px; }
+.hint { color: var(--muted); margin: 0 0 10px; font-size: 12px; }
+.opt { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.buttons { display: flex; gap: 8px; }
+button { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--text); font-weight: 600; cursor: pointer; }
+button.primary { background: var(--blue); border-color: var(--blue); color: #fff; flex: 2; }
+button:disabled { opacity: .5; cursor: default; }
