@@ -84,7 +84,8 @@ async function addBlob(msg, page) {
   const buf = await res.arrayBuffer();
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))]
     .slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const key = "stored:" + hash;
+  // Same picture under a different label (e.g. two blank book pages) is kept as its own file.
+  const key = "stored:" + (msg.name ? msg.name + ":" : "") + hash;
   if (seen.has(key)) return 0;
   seen.add(key);
   await DB.put(hash, { type: res.headers.get("content-type") || "", data: buf });

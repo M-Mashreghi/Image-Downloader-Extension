@@ -13,6 +13,7 @@ Turn it on, browse, and it collects every image you see. Click **Download ZIP** 
 - Click the icon and flip the switch to **ON** (the icon turns blue). The badge shows how many images are collected.
 - Browse normally. Scroll down pages so lazy-loaded images load; they get picked up too. It works across all tabs.
 - On book readers like HathiTrust, **reload the page after installing or updating** the extension, then turn it on and scroll through the pages you want. Each page is saved as it appears.
+- **Auto-scroll**: pick a speed (Slow / Normal / Fast) and click **⬇ Auto-scroll**. The page scrolls down by itself (it also finds a reader's own scroll area, like HathiTrust's) so every image loads and is saved. It stops by itself at the end; click the blue badge or press **Esc** to stop earlier. Use **Slow** on sites that limit how fast you can load pages.
 - Click **Download ZIP**. A tab opens, fetches each image, and saves `images_<date>_<time>.zip` to your Downloads.
 - **Clear** empties the list to start a new batch. Turning it **OFF** stops collecting but keeps the list.
 - **Only from this website**: open the site you want, then tick this box in the popup. It only collects from that site (and its subdomains) and ignores your other tabs. Untick it to collect from everywhere again.

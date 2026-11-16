@@ -24,3 +24,8 @@ button:disabled { opacity: .5; cursor: default; }
 .opt { margin-bottom: 8px; align-items: flex-start; }
 .opt input { margin-top: 2px; }
 .buttons { margin-top: 12px; }
+.auto { display: flex; gap: 8px; margin-top: 4px; }
+.auto button { flex: 2; }
+.auto button.running { background: #dc2626; border-color: #dc2626; color: #fff; }
+select { flex: 1; padding: 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+#autoHint { margin-top: 6px; }

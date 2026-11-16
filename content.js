@@ -243,8 +243,89 @@
     if (enabled) { reported.clear(); blobDone.clear(); start(); } else stop();
   }
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg && msg.type === "state") setEnabled(msg.enabled);
+  // ---- Auto-scroll (top frame only): slowly scrolls the page so lazy images load ----
+  const SPEEDS = { slow: 120, normal: 300, fast: 700 };   // pixels per second
+  let auto = null;   // { timer, target, speed, lastPos, stuckSince, badge }
+
+  function scrollTargets() {
+    const list = [];
+    const root = document.scrollingElement || document.documentElement;
+    if (root.scrollHeight > root.clientHeight + 50) list.push(root);
+    for (const el of document.querySelectorAll("body *")) {
+      if (el.scrollHeight <= el.clientHeight + 50 || el.clientHeight < 150) continue;
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === "auto" || oy === "scroll" || oy === "overlay") list.push(el);
+    }
+    // The biggest visible scroll area is usually the reader / main content.
+    const area = (el) => (el === root ? innerWidth * innerHeight : el.clientWidth * el.clientHeight);
+    return list.sort((a, b) => area(b) - area(a));
+  }
+
+  function posOf(el) { return el.scrollTop; }
+
+  function makeBadge(speed) {
+    const b = document.createElement("div");
+    b.textContent = "⬇ Auto-scrolling (" + speed + ") – click or press Esc to stop";
+    Object.assign(b.style, {
+      position: "fixed", right: "16px", bottom: "16px", zIndex: 2147483647, padding: "8px 12px",
+      background: "#2563eb", color: "#fff", font: "600 13px system-ui, sans-serif", borderRadius: "8px",
+      boxShadow: "0 2px 10px rgba(0,0,0,.3)", cursor: "pointer"
+    });
+    b.addEventListener("click", () => stopAuto("Stopped"));
+    (document.body || document.documentElement).appendChild(b);
+    return b;
+  }
+
+  function onKey(e) { if (e.key === "Escape") stopAuto("Stopped"); }
+
+  function startAuto(speedName) {
+    stopAuto();
+    const targets = scrollTargets();
+    if (!targets.length) return { ok: false, error: "Nothing to scroll on this page." };
+    const speed = SPEEDS[speedName] || SPEEDS.normal;
+    auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0 };
+    auto.badge = makeBadge(speedName);
+    addEventListener("keydown", onKey, true);
+    auto.timer = setInterval(tick, 100);
+    return { ok: true };
+  }
+
+  function tick() {
+    if (!auto) return;
+    const t = auto.targets[auto.i];
+    auto.carry += auto.step;
+    const px = Math.floor(auto.carry);
+    auto.carry -= px;
+    t.scrollTop += px;
+    const pos = posOf(t);
+    if (pos !== auto.lastPos) { auto.lastPos = pos; auto.stuckSince = Date.now(); return; }
+    const stuck = Date.now() - auto.stuckSince;
+    // This area doesn't move at all: try the next scrollable area.
+    if (stuck > 1500 && auto.lastPos <= 0 && auto.i < auto.targets.length - 1) {
+      auto.i++; auto.lastPos = -1; auto.stuckSince = Date.now(); return;
+    }
+    // Reached the bottom and nothing new loaded for 10 seconds: done.
+    if (stuck > 10000) stopAuto("Reached the end");
+  }
+
+  function stopAuto(msg) {
+    if (!auto) return;
+    clearInterval(auto.timer);
+    removeEventListener("keydown", onKey, true);
+    const b = auto.badge;
+    auto = null;
+    if (b) {
+      if (msg) { b.textContent = "✓ Auto-scroll: " + msg; b.style.background = "#16a34a"; setTimeout(() => b.remove(), 4000); }
+      else b.remove();
+    }
+  }
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg) return;
+    if (msg.type === "state") setEnabled(msg.enabled);
+    if (window !== window.top) return;
+    if (msg.type === "autoscroll") sendResponse(msg.on ? startAuto(msg.speed) : (stopAuto("Stopped"), { ok: true }));
+    else if (msg.type === "autoscrollState") sendResponse({ running: !!auto, speed: auto ? auto.speedName : "" });
   });
 
   chrome.storage.local.get({ enabled: false }).then((s) => setEnabled(s.enabled));

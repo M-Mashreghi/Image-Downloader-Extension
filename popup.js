@@ -47,3 +47,36 @@ $("skipSmall").addEventListener("change", (e) => chrome.storage.local.set({ skip
 
 chrome.storage.onChanged.addListener(refresh);
 activeHost().then((h) => { currentHost = h; refresh(); });
+
+// ---- Auto-scroll ----
+let autoRunning = false;
+function renderAuto(running) {
+  autoRunning = running;
+  $("autoBtn").textContent = running ? "■ Stop scrolling" : "⬇ Auto-scroll";
+  $("autoBtn").classList.toggle("running", running);
+}
+async function activeTabId() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab && tab.id;
+}
+chrome.storage.local.get({ speed: "normal" }).then((s) => { $("speed").value = s.speed; });
+$("speed").addEventListener("change", (e) => chrome.storage.local.set({ speed: e.target.value }));
+activeTabId().then((id) => chrome.tabs.sendMessage(id, { type: "autoscrollState" }))
+  .then((r) => renderAuto(!!(r && r.running))).catch(() => {});
+$("autoBtn").addEventListener("click", async () => {
+  try {
+    const id = await activeTabId();
+    if (!autoRunning) {
+      // Make sure collecting is on while it scrolls.
+      if (!$("enabled").checked) render(await chrome.runtime.sendMessage({ type: "setEnabled", enabled: true }));
+      const r = await chrome.tabs.sendMessage(id, { type: "autoscroll", on: true, speed: $("speed").value });
+      if (r && r.ok) { renderAuto(true); window.close(); }
+      else $("autoHint").textContent = (r && r.error) || "Couldn't scroll this page.";
+    } else {
+      await chrome.tabs.sendMessage(id, { type: "autoscroll", on: false });
+      renderAuto(false);
+    }
+  } catch {
+    $("autoHint").textContent = "Reload this page first (F5), then try again.";
+  }
+});

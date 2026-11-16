@@ -22,6 +22,16 @@
   <label class="opt"><input type="checkbox" id="siteOnly"> <span>Only from this website<b id="siteName"></b></span></label>
   <label class="opt"><input type="checkbox" id="skipSmall"> Skip tiny images (under 50×50 px)</label>
 
+  <div class="auto">
+    <button id="autoBtn">⬇ Auto-scroll</button>
+    <select id="speed" title="Scroll speed">
+      <option value="slow">Slow</option>
+      <option value="normal" selected>Normal</option>
+      <option value="fast">Fast</option>
+    </select>
+  </div>
+  <p class="hint" id="autoHint">Scrolls the page down by itself so every image loads.</p>
+
   <div class="buttons">
     <button id="download" class="primary">Download ZIP</button>
     <button id="clear">Clear</button>
