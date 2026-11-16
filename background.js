@@ -145,6 +145,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         broadcastState();
         sendResponse(state());
         break;
+      case "autoFinish": {
+        // Auto-scroll reached the end: build + save the ZIP in a background tab,
+        // which then closes the page that was scrolled.
+        const { skipSmall } = await chrome.storage.local.get({ skipSmall: false });
+        const q = new URLSearchParams({ skipSmall: skipSmall ? "1" : "0", auto: "1",
+          closeTab: String(sender.tab ? sender.tab.id : ""), title: msg.title || "" });
+        chrome.tabs.create({ url: chrome.runtime.getURL("download.html?" + q), active: false });
+        sendResponse({ ok: true });
+        break;
+      }
       case "getImages":
         sendResponse({ images });
         break;

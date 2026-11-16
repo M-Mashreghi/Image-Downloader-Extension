@@ -283,7 +283,8 @@
     const targets = scrollTargets();
     if (!targets.length) return { ok: false, error: "Nothing to scroll on this page." };
     const speed = SPEEDS[speedName] || SPEEDS.normal;
-    auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0 };
+    auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0, finish: false };
+    chrome.storage.local.get({ autoFinish: false }).then((st) => { if (auto) auto.finish = st.autoFinish; });
     auto.badge = makeBadge(speedName);
     addEventListener("keydown", onKey, true);
     auto.timer = setInterval(tick, 100);
@@ -305,6 +306,15 @@
       auto.i++; auto.lastPos = -1; auto.stuckSince = Date.now(); return;
     }
     // Reached the bottom and nothing new loaded for 10 seconds: done.
+    // With "download & close" on: 5 seconds at the bottom, then save the ZIP automatically.
+    if (auto.finish && stuck > 5000) {
+      const b = auto.badge;
+      auto.badge = null;
+      stopAuto();
+      if (b) { b.textContent = "⬇ Reached the end – downloading ZIP…"; b.style.background = "#16a34a"; }
+      chrome.runtime.sendMessage({ type: "autoFinish", title: document.title }).catch(() => {});
+      return;
+    }
     if (stuck > 10000) stopAuto("Reached the end");
   }
 

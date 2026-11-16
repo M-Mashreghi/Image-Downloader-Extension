@@ -80,3 +80,6 @@ $("autoBtn").addEventListener("click", async () => {
     $("autoHint").textContent = "Reload this page first (F5), then try again.";
   }
 });
+
+chrome.storage.local.get({ autoFinish: false }).then((s) => { $("autoFinish").checked = s.autoFinish; });
+$("autoFinish").addEventListener("change", (e) => chrome.storage.local.set({ autoFinish: e.target.checked }));

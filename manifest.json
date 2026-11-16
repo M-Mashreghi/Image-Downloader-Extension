@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Image Collector - Download All as ZIP",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Turn it on and it collects every image you see. Download them all as one ZIP, named 1, 2, 3...",
   "permissions": [
     "storage",
     "webRequest",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

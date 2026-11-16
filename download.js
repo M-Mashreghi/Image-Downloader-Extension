@@ -2,6 +2,9 @@
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const SKIP_SMALL = params.get("skipSmall") === "1";
+const AUTO = params.get("auto") === "1";                 // started by auto-scroll "download & close"
+const CLOSE_TAB = parseInt(params.get("closeTab") || "", 10);
+const TITLE = (params.get("title") || "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
 const MIN_SIDE = 50;
 const CONCURRENCY = 6;
 
@@ -129,7 +132,8 @@ async function run() {
 
   const blob = zip.finish();
   const url = URL.createObjectURL(blob);
-  const filename = `images_${stamp()}.zip`;
+  const filename = AUTO && TITLE ? `${TITLE}_${stamp()}.zip` : `images_${stamp()}.zip`;
+  if (AUTO) return autoSave(url, filename, n);
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.textContent = `Save ${filename} again`;
   document.body.appendChild(a); a.click(); a.remove();
@@ -145,6 +149,33 @@ async function run() {
   again.href = url; again.download = filename; again.textContent = "Download again";
   done.appendChild(again);
   done.style.display = "block";
+}
+
+// Save without asking, wait until the file is fully written, then clear the
+// list (ready for the next book) and close the scrolled page and this tab.
+async function autoSave(url, filename, n) {
+  $("status").textContent = `Saving ${filename}…`;
+  const id = await chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: false });
+  const state = await new Promise((resolve) => {
+    const check = (d) => {
+      if (d.id !== id || !d.state) return;
+      const s = d.state.current;
+      if (s === "complete" || s === "interrupted") { chrome.downloads.onChanged.removeListener(check); resolve(s); }
+    };
+    chrome.downloads.onChanged.addListener(check);
+    chrome.downloads.search({ id }).then(([d]) => d && check({ id, state: { current: d.state } }));
+  });
+  if (state !== "complete") {
+    $("status").textContent = "The download was interrupted. Nothing was closed or cleared.";
+    return;
+  }
+  $("status").textContent = `Done! ${n} images saved to ${filename}. Closing…`;
+  await chrome.runtime.sendMessage({ type: "clear" });
+  if (CLOSE_TAB) await chrome.tabs.remove(CLOSE_TAB).catch(() => {});
+  setTimeout(async () => {
+    const me = await chrome.tabs.getCurrent();
+    if (me) chrome.tabs.remove(me.id);
+  }, 1500);
 }
 
 run().catch((e) => { $("status").textContent = "Something went wrong: " + e.message; });
