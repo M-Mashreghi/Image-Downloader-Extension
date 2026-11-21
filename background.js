@@ -150,7 +150,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // which then closes the page that was scrolled.
         const { skipSmall } = await chrome.storage.local.get({ skipSmall: false });
         const q = new URLSearchParams({ skipSmall: skipSmall ? "1" : "0", auto: "1",
-          closeTab: String(sender.tab ? sender.tab.id : ""), title: msg.title || "" });
+          closeTab: String(sender.tab ? sender.tab.id : ""), title: msg.title || "", name: msg.name || "" });
         chrome.tabs.create({ url: chrome.runtime.getURL("download.html?" + q), active: false });
         sendResponse({ ok: true });
         break;
@@ -160,7 +160,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       case "clear":
         images = []; seen = new Set();
-        await chrome.storage.local.set({ images });
+        await chrome.storage.local.set({ images, zipName: "" });
         await DB.clear().catch(() => {});
         updateBadge();
         broadcastState(); // lets open pages report their images again

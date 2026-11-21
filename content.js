@@ -278,12 +278,12 @@
 
   function onKey(e) { if (e.key === "Escape") stopAuto("Stopped"); }
 
-  function startAuto(speedName) {
+  function startAuto(speedName, zipName) {
     stopAuto();
     const targets = scrollTargets();
     if (!targets.length) return { ok: false, error: "Nothing to scroll on this page." };
     const speed = SPEEDS[speedName] || SPEEDS.normal;
-    auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0, finish: false };
+    auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0, finish: false, zipName: zipName || "" };
     chrome.storage.local.get({ autoFinish: false }).then((st) => { if (auto) auto.finish = st.autoFinish; });
     auto.badge = makeBadge(speedName);
     addEventListener("keydown", onKey, true);
@@ -308,11 +308,11 @@
     // Reached the bottom and nothing new loaded for 10 seconds: done.
     // With "download & close" on: 5 seconds at the bottom, then save the ZIP automatically.
     if (auto.finish && stuck > 5000) {
-      const b = auto.badge;
+      const b = auto.badge, zipName = auto.zipName;
       auto.badge = null;
       stopAuto();
       if (b) { b.textContent = "⬇ Reached the end – downloading ZIP…"; b.style.background = "#16a34a"; }
-      chrome.runtime.sendMessage({ type: "autoFinish", title: document.title }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "autoFinish", title: document.title, name: zipName }).catch(() => {});
       return;
     }
     if (stuck > 10000) stopAuto("Reached the end");
@@ -334,7 +334,7 @@
     if (!msg) return;
     if (msg.type === "state") setEnabled(msg.enabled);
     if (window !== window.top) return;
-    if (msg.type === "autoscroll") sendResponse(msg.on ? startAuto(msg.speed) : (stopAuto("Stopped"), { ok: true }));
+    if (msg.type === "autoscroll") sendResponse(msg.on ? startAuto(msg.speed, msg.name) : (stopAuto("Stopped"), { ok: true }));
     else if (msg.type === "autoscrollState") sendResponse({ running: !!auto, speed: auto ? auto.speedName : "" });
   });
 

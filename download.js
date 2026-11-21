@@ -4,7 +4,9 @@ const params = new URLSearchParams(location.search);
 const SKIP_SMALL = params.get("skipSmall") === "1";
 const AUTO = params.get("auto") === "1";                 // started by auto-scroll "download & close"
 const CLOSE_TAB = parseInt(params.get("closeTab") || "", 10);
-const TITLE = (params.get("title") || "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+const cleanName = (v) => (v || "").replace(/\.zip$/i, "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 100);
+const TITLE = cleanName(params.get("title")).slice(0, 80);
+const NAME = cleanName(params.get("name"));               // the name typed in the popup
 const MIN_SIDE = 50;
 const CONCURRENCY = 6;
 
@@ -132,11 +134,14 @@ async function run() {
 
   const blob = zip.finish();
   const url = URL.createObjectURL(blob);
-  const filename = AUTO && TITLE ? `${TITLE}_${stamp()}.zip` : `images_${stamp()}.zip`;
+  const filename = NAME ? `${NAME}.zip` : AUTO && TITLE ? `${TITLE}_${stamp()}.zip` : `images_${stamp()}.zip`;
   if (AUTO) return autoSave(url, filename, n);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.textContent = `Save ${filename} again`;
-  document.body.appendChild(a); a.click(); a.remove();
+  // chrome.downloads keeps the exact name (including Persian/Arabic letters).
+  chrome.downloads.download({ url, filename, conflictAction: "uniquify", saveAs: false }).catch(() => {
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
 
   const mb = (blob.size / 1048576).toFixed(1);
   $("status").textContent = `Done! ${n} images saved to ${filename} (${mb} MB).`;

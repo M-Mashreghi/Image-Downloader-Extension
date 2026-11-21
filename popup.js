@@ -38,7 +38,8 @@ $("clear").addEventListener("click", async () => {
 
 $("download").addEventListener("click", () => {
   const skip = $("skipSmall").checked ? "1" : "0";
-  chrome.tabs.create({ url: chrome.runtime.getURL(`download.html?skipSmall=${skip}`) });
+  const q = new URLSearchParams({ skipSmall: skip, name: $("zipName").value.trim() });
+  chrome.tabs.create({ url: chrome.runtime.getURL("download.html?" + q) });
   window.close();
 });
 
@@ -69,7 +70,7 @@ $("autoBtn").addEventListener("click", async () => {
     if (!autoRunning) {
       // Make sure collecting is on while it scrolls.
       if (!$("enabled").checked) render(await chrome.runtime.sendMessage({ type: "setEnabled", enabled: true }));
-      const r = await chrome.tabs.sendMessage(id, { type: "autoscroll", on: true, speed: $("speed").value });
+      const r = await chrome.tabs.sendMessage(id, { type: "autoscroll", on: true, speed: $("speed").value, name: $("zipName").value.trim() });
       if (r && r.ok) { renderAuto(true); window.close(); }
       else $("autoHint").textContent = (r && r.error) || "Couldn't scroll this page.";
     } else {
@@ -83,3 +84,10 @@ $("autoBtn").addEventListener("click", async () => {
 
 chrome.storage.local.get({ autoFinish: false }).then((s) => { $("autoFinish").checked = s.autoFinish; });
 $("autoFinish").addEventListener("change", (e) => chrome.storage.local.set({ autoFinish: e.target.checked }));
+
+// ZIP name: remembered while you browse, emptied when the list is cleared.
+chrome.storage.local.get({ zipName: "" }).then((s) => { $("zipName").value = s.zipName; });
+$("zipName").addEventListener("input", (e) => chrome.storage.local.set({ zipName: e.target.value }));
+chrome.tabs.query({ active: true, currentWindow: true }).then(([t]) => {
+  if (t && t.title && /^https?:/.test(t.url || "")) $("zipName").placeholder = t.title.slice(0, 60);
+});
