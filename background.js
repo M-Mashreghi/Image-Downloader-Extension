@@ -2,7 +2,7 @@
 // Keeps the ordered, de-duplicated list of images in chrome.storage.local
 // (and bytes of in-page blob: images in IndexedDB) so nothing is lost when
 // the service worker goes to sleep.
-importScripts("db.js");
+importScripts("db.js", "queue.js");
 
 const ICON = (state) => ({
   16: `icons/${state}16.png`, 32: `icons/${state}32.png`,
@@ -106,6 +106,23 @@ chrome.webRequest.onCompleted.addListener(
   { urls: ["<all_urls>"], types: ["image"] }
 );
 
+async function setCollecting(on) {
+  await ready;
+  enabled = !!on;
+  await chrome.storage.local.set({ enabled });
+  updateBadge();
+  broadcastState();
+}
+
+async function clearList() {
+  await ready;
+  images = []; seen = new Set();
+  await chrome.storage.local.set({ images, zipName: "" });
+  await DB.clear().catch(() => {});
+  updateBadge();
+  broadcastState();
+}
+
 async function broadcastState() {
   const tabs = await chrome.tabs.query({});
   for (const t of tabs) {
@@ -155,15 +172,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       }
+      case "autoSaved":
+        // The ZIP is on disk. download.js closes the scrolled page right after this.
+        await Q.saved(msg.closedTab, msg.filename);
+        sendResponse({ ok: true });
+        break;
+      case "queueStart": await Q.start(); sendResponse({ ok: true }); break;
+      case "queueStop": await Q.stop(); sendResponse({ ok: true }); break;
+      case "queueSkip": {
+        const s = await Q.get();
+        const it = s.queue[s.queueCurrent];
+        if (s.queueRunning && it) {
+          it.status = "skipped";
+          const tab = s.queueTabId;
+          await Q.set({ queue: s.queue, queueTabId: null, queueCurrent: -1 });
+          await clearList();
+          if (tab) chrome.tabs.remove(tab).catch(() => {});
+          await Q.openNext();
+        }
+        sendResponse({ ok: true });
+        break;
+      }
       case "getImages":
         sendResponse({ images });
         break;
       case "clear":
-        images = []; seen = new Set();
-        await chrome.storage.local.set({ images, zipName: "" });
-        await DB.clear().catch(() => {});
-        updateBadge();
-        broadcastState(); // lets open pages report their images again
+        await clearList(); // also lets open pages report their images again
         sendResponse(state());
         break;
       default:

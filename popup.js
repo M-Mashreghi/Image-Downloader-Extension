@@ -91,3 +91,9 @@ $("zipName").addEventListener("input", (e) => chrome.storage.local.set({ zipName
 chrome.tabs.query({ active: true, currentWindow: true }).then(([t]) => {
   if (t && t.title && /^https?:/.test(t.url || "")) $("zipName").placeholder = t.title.slice(0, 60);
 });
+
+$("openQueue").addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("queue.html") });
+  window.close();
+});
