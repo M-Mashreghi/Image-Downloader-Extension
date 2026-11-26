@@ -278,13 +278,14 @@
 
   function onKey(e) { if (e.key === "Escape") stopAuto("Stopped"); }
 
-  function startAuto(speedName, zipName) {
+  function startAuto(speedName, zipName, forceFinish) {
     stopAuto();
     const targets = scrollTargets();
     if (!targets.length) return { ok: false, error: "Nothing to scroll on this page." };
     const speed = SPEEDS[speedName] || SPEEDS.normal;
     auto = { targets, i: 0, speedName, step: speed / 10, lastPos: -1, stuckSince: Date.now(), carry: 0, finish: false, zipName: zipName || "" };
-    chrome.storage.local.get({ autoFinish: false }).then((st) => { if (auto) auto.finish = st.autoFinish; });
+    if (forceFinish) auto.finish = true;
+    else chrome.storage.local.get({ autoFinish: false }).then((st) => { if (auto) auto.finish = st.autoFinish; });
     auto.badge = makeBadge(speedName);
     addEventListener("keydown", onKey, true);
     auto.timer = setInterval(tick, 100);
@@ -334,7 +335,7 @@
     if (!msg) return;
     if (msg.type === "state") setEnabled(msg.enabled);
     if (window !== window.top) return;
-    if (msg.type === "autoscroll") sendResponse(msg.on ? startAuto(msg.speed, msg.name) : (stopAuto("Stopped"), { ok: true }));
+    if (msg.type === "autoscroll") sendResponse(msg.on ? startAuto(msg.speed, msg.name, msg.finish) : (stopAuto("Stopped"), { ok: true }));
     else if (msg.type === "autoscrollState") sendResponse({ running: !!auto, speed: auto ? auto.speedName : "" });
   });
 

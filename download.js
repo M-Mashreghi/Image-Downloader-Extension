@@ -172,10 +172,12 @@ async function autoSave(url, filename, n) {
   });
   if (state !== "complete") {
     $("status").textContent = "The download was interrupted. Nothing was closed or cleared.";
+    chrome.runtime.sendMessage({ type: "queueStop" }).catch(() => {});
     return;
   }
   $("status").textContent = `Done! ${n} images saved to ${filename}. Closing…`;
   await chrome.runtime.sendMessage({ type: "clear" });
+  await chrome.runtime.sendMessage({ type: "autoSaved", closedTab: CLOSE_TAB, filename }).catch(() => {});
   if (CLOSE_TAB) await chrome.tabs.remove(CLOSE_TAB).catch(() => {});
   setTimeout(async () => {
     const me = await chrome.tabs.getCurrent();
